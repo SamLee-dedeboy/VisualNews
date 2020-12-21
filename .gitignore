@@ -1,0 +1,8 @@
+node_modules/
+pyltp/
+NamedEntityRecognizer/ltp_data_v3.4.0/
+NamedEntityRecognizer/.idea/
+*.pptx
+*.rar
+*.zip
+*.model

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Access-Control-Allow-Origin" content="*" />
+    <title>VisualNews</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" type="text/css" href="http://unpkg.com/view-design/dist/styles/iview.css">
+    <script type="text/javascript" src="http://vuejs.org/js/vue.min.js"></script>
+    <script type="text/javascript" src="http://unpkg.com/view-design/dist/iview.min.js"></script>
+    <script type="text/javascript" src="PapaParse-5.0.2/papaparse.min.js"></script>
+    <script src="https://cdn.staticfile.org/vue-resource/1.5.1/vue-resource.min.js"></script>
+    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+    <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    <script src="https://unpkg.com/webcola/WebCola/cola.min.js"></script>
+    <script src="cytoscape-cola/cytoscape-cola.js"></script>
+    <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+    <script src="cytoscape-cose-bilkent/cytoscape-cose-bilkent.js"></script>
+    <script src="plotly-latest.min.js"></script> 
+</head>
+<body>
+    <div id="app">
+        <div id='header'>
+          <img src="header.png"/> 
+        </div>
+        <div id="searchAndResult">
+          <div id="inputArea" class="div-inline" style="float:left">
+              <v-input-box title="Keyword " v-model:value="keyword"></v-input-box><br>
+              <v-input-box title="Location" v-model:value="location"></v-input-box> <br>
+              <v-input-box title="Person  " v-model:value="person"></v-input-box><br>
+              <i-button type="primary" shape="circle"  @click="searchClicked" style="margin-left:230px;margin-top:10px;">Search</i-button>
+          </div>
+          <div id="resultArea" class="div-inline" style="float:left">
+            <v-search-result-area v-bind:content="searchResult" ></v-search-result-area>
+            
+          </div>
+       </div>
+        <div style="clear:both"> </div>
+        <div id='newsTab'>
+            <Tabs type='card' value="name1">
+                <tab-pane label="Map" name="name1">
+                    <div id="myMap"></div>
+
+                </tab-pane>
+                <tab-pane label="TimeGraph" name="name2">
+                    <v-time-heat-map ref="timeGraph" v-bind:dots="posOnTimeGraph"></v-time-heat-map>
+                    <Slider 
+                    v-bind:value="years.min"
+                    v-bind:min="years.min" 
+                    v-bind:max="years.max"
+                    v-bind:marks="marks"
+                    :step=1 
+                    show-stops 
+                    show-input
+                    input-size="large"
+                    v-on:on-input="updateTimeGraph"
+                    style="margin-left:20px"></Slider>
+                </tab-pane>
+            </Tabs>
+        </div>
+
+    </div>
+
+ 
+
+
+<script type='text/javascript'>
+function createModal(component,event) {
+      component.$Modal.confirm({
+                    width:870,
+                    closable:true,
+                    draggable:true,
+                    render: (h) => {
+                        return h('v-event-graph', 
+                          {
+                            props: {
+                              event:event
+                            }
+                          })
+                    }
+                })
+      }
+function showModal(component,event) {
+        console.log(event.graph)
+        createModal(component,event)
+        component.$nextTick(function() {
+          var cy = cytoscape({
+          container: document.getElementById("cy"), // container to render in
+
+          elements: event.graph,
+
+          style: [ // the stylesheet for the graph
+            {
+              selector: 'node',
+              style: {
+                'background-color': function(ele) {
+                  var tag = ele._private.data.tag
+                  switch(tag) {
+                    case "Nh": return '#000000';break; //黑色
+                    case "Ni": return '#0066FF';break; //蓝色
+                    case "Ns":  return '#8B4513';break; //棕色
+                    case "Nr": return '#CCDDFF';break; //浅白色
+                    case "time": return '#00FF00';break; //绿色
+                  }
+                },
+                'label': 'data(id)'
+              }
+            },
+
+            {
+              selector: 'edge',
+              style: {
+                'width': 3,
+                'line-color': '#ccc',
+                'target-arrow-color': '#ccc',
+                'target-arrow-shape': 'triangle'
+              }
+            }
+          ],
+
+          layout: {
+            name: 'cose-bilkent',
+            nodeDimensionsIncludeLabels: true,
+            idealEdgeLength: 120,
+            tile:false,
+            tilingPaddingVertical: 5,
+          }              
+          })
+        })
+      }
+Vue.component('v-input-box', {
+    props:['title','value'],
+    template: 
+    `
+    <div :id=title>
+    <i-input :placeholder=title v-bind:value="value" v-on:on-change="$emit('input', $event.target.value)" style="width: 300px;margin:auto" />
+    </div>
+    `
+
+}) 
+Vue.component('v-event-graph', {
+
+    props:['event'],
+    
+    template:
+    `
+    <div>
+      <div id="cy" style="width:800px;height:600px"></div>
+      <div id="textCard" >
+            <Card >
+                <p>{{event.description}}</p>
+            </Card>
+      </div>   
+    </div
+    `
+})
+Vue.component('v-search-result-area', {
+    methods: {
+      
+      createModal(index) {
+        this.$Modal.confirm({
+                    width:870,
+                    closable:true,
+                    draggable:true,
+                    render: (h) => {
+                        return h('v-event-graph', 
+                          {
+                            props: {
+                              event:this.content[index]
+                            }
+                          })
+                    }
+                })
+      },
+      searchAreaShowModal(index) {
+        showModal(this,this.content[index])
+        
+      },
+    },
+    props:['content'],
+    template: 
+    `
+    <div> 
+        <Scroll style='width:800px;'>
+            <List item-layout="vertical" >
+                <list-item v-for="(item,index) in content" :key="item.title">
+                    <Card style="background:#eee;padding:20px;">
+                        <p slot="title">{{item.title}}</p>
+                        <p>{{item.description}}</p>
+                        <p slot="extra">{{item.date}}</p>
+                        <CellGroup>
+                            <Cell :label="item.source" style="margin-left:7px"></Cell>
+                            <Cell v-if="item.url" title="Source Link" :to='item.url' style="margin-left:7px;width:150px;background:rgb(238, 238, 238);">
+                              
+                            </Cell>
+                            <Cell v-if="item.url"  style="width:150px;background:rgb(238, 238, 238);">
+                              <i-button   shape="circle" @click="searchAreaShowModal(index)">
+                                Show Graph
+                              </i-button>
+                              
+                             
+                           
+                            </Cell>
+
+                           
+                            
+                        </CellGroup>
+                            
+                    </Card>
+                </list-item>
+            
+            </List>
+        </Scroll>
+    </div> 
+    `
+})
+Vue.component('v-time-heat-map', {
+  
+  mounted() {
+    console.log("mounted", this.dots)
+  },
+  methods:{
+    updateTimeGraph(index) {
+      console.log(index)
+      console.log("dots:",this.dots[index].r)
+      
+      var data= [
+          {
+            type: "scatterpolargl",
+              r: this.dots[index].r,
+            theta: this.dots[index].theta,
+            showlegend:false,
+            mode: "markers",
+            name: "monthly distribution",
+            marker: {
+              color: "rgb(217,95,2)",
+              size: 20,
+              line: {
+                color: "white"
+              },
+              "opacity": 0.7
+            },
+            "cliponaxis": false,
+            hoverinfo:"text",
+            hovertext:this.dots[index].text
+          },
+      ]
+      var layout = {
+          title: "Event Distribution in month",
+          font: {
+            size: 15
+          },
+          showlegend: true,
+          polar: {
+            bgcolor: "rgb(223, 223, 223)",
+            angularaxis: {
+              type:"linear",
+              tickwidth: 2,
+              linewidth: 3,
+              layer: "below traces",
+              direction:"clockwise",
+              tickmode:"array",
+              tickvals:[0,30,60,90,120,150,180,210,240,270,300,330],
+              ticktext:["Dec","Jan","Feb","Mar","Apr","May","June","July","Aug","Sept","Oct","Nov"]
+            },
+            radialaxis: {
+              visible:false,
+              side: "counterclockwise",
+              showline: true,
+              linewidth: 2,
+              tickwidth: 2,
+              gridcolor: "white",
+              gridwidth: 2,
+              fixedrange:true
+            }
+          },
+          paper_bgcolor: "rgb(223, 223, 223)",
+        }
+
+      Plotly.newPlot('time-heat-map', data, layout);
+      }
+  },
+  props:['dots'],
+
+  template:
+  `
+  <div id='time-heat-map'></div>
+  `
+  
+})
+
+var vm = new Vue({
+    el : '#app',
+    data : {
+        keyword: "",
+        location: "",
+        person: "",
+        map_info_split: 0.5,
+
+        searchResult:[
+            {
+                title:"Enter some keywords to search news",
+                description:""
+            }
+        ],
+        years: {
+          min:2020,
+          max:2020
+        },
+        marks: {
+           0:'0',
+           2021:'2021'
+        },
+        modal:false,
+        posOnTimeGraph: [
+          {
+            r:[], 
+            theta:[],
+            text:[]
+          } 
+        ]
+    },
+    methods : {
+        submit : function(keyword, location, person) {
+            var url = 'http://127.0.0.1:8081/news/'
+            console.log(keyword, location, person)
+            if(keyword === "") {
+              keyword = "null"
+            }
+            if(location === "") {
+              location = "null"
+            }
+            if(person === "") {
+              person = "null"
+            }
+            console.log(keyword, location, person)
+
+            //get result
+            //发送get请求
+            this.$http.get('http://127.0.0.1:8081/news/'+keyword+'/'+location+'/'+person).then(function(res){
+                console.log("get")
+                this.searchResult = res.body
+                console.log(this.searchResult)
+                //this.selectedNews=JSON.parse(JSON.stringify(this.searchResult[0]))
+
+                this.updateMap();
+                //this.updateTimeLine()
+
+                this.$refs.timeGraph.updateTimeGraph(this.years.min)
+
+
+            },function(){
+                console.log('请求失败处理');
+            });
+        },
+        sliderMoved(value) {
+          console.log(value)
+        },
+        showModal(item) {
+          this.modal=true
+          console.log("item:",item)
+          console.log(this.modal)
+        },
+        updateTimeGraph(value) {
+          this.$refs.timeGraph.updateTimeGraph(value)
+
+        },
+        updateMap: function() {
+          console.log("Update Map")
+            //console.log(this.searchResult[0].date)
+            if(this.searchResult.length == 0) {
+              console.log("no result")
+              return 
+            }
+            layer.clear()
+            var avg_x=0
+            var avg_y=0
+            this.years.min = this.years.max = this.searchResult[0].date.split("-")[0]
+            console.log(this.searchResult.length)
+            var dateList=[]
+            var day_case = 15
+            for(var j = 0; j < 3; j++) {
+              day_case += 5
+              dateList.push("2020-02-" + day_case.toString())
+            }
+            day_case = 20
+            for(var j = 0; j < 5; j++) {
+              day_case += 2
+              dateList.push("2020-03-" + day_case.toString())
+            }
+            day_case = 1
+            for(var j = 0; j < 15; j++) {
+              day_case += 2
+              dateList.push("2020-04-" + day_case.toString())
+            }
+            day_case = 20
+            for(var j = 0; j < 10; j++) {
+              day_case += 1
+              dateList.push("2020-04-" + day_case.toString())
+            }
+            day_case = 1
+            for(var j = 0; j < 8; j++) {
+              day_case += 1
+              dateList.push("2020-05-" + day_case.toString())
+            }
+            day_case = 1
+            for(var j = 0; j < 4; j++) {
+              day_case += 1
+              dateList.push("2020-05-" + day_case.toString())
+            }
+            for(var j = 0; j < this.searchResult.length; j++) {
+              console.log(dateList[j])
+              this.searchResult[j].date=dateList[j]
+            }
+            for(var i = 0; i < this.searchResult.length; i++) {
+                //add pin
+                var coordinateArray = this.searchResult[i]["coordinate"];
+                var x = Microsoft.Maps.Location.normalizeLongitude(parseFloat(coordinateArray[0]))
+                var y = parseFloat(coordinateArray[1])
+                x += Math.random()*6-6
+                y += Math.random()*6-6
+                avg_x+=x
+                avg_y+=y
+                var coordinate = new Microsoft.Maps.Location(x,y)
+                      
+                var pin = new Microsoft.Maps.Pushpin(coordinate)
+                pin.data = JSON.parse(JSON.stringify(this.searchResult[i]))
+                   
+                layer.add(pin)
+                //TODO:collect time statistics
+                //console.log(this.searchResult[i].date)
+                //time format: month/day/year
+                
+                var timeStr = this.searchResult[i].date.split("-")
+                var year = parseInt(timeStr[0])
+                var month = parseInt(timeStr[1])
+                var day = parseInt(timeStr[2])
+                //console.log(year,month,day)
+                //console.log(timeStr)
+                
+                this.years.min = Math.min(this.years.min, year)
+                this.years.max = Math.max(this.years.max, year)
+                this.marks[year] = year.toString()
+
+                var r = 5
+                var theta = (month%12)*30 + day-1
+                console.log(theta)
+                if(this.posOnTimeGraph[year] == undefined) {
+                  this.posOnTimeGraph[year] = {
+                    r:[],
+                    theta:[],
+                    text:[]
+                  }
+                }
+                this.posOnTimeGraph[year].r.push(r)
+                this.posOnTimeGraph[year].theta.push(theta)
+                this.posOnTimeGraph[year].text.push(month+"-"+day)
+            }
+
+            if(this.years.min == this.years.max) {
+              this.years.min = this.years.max - 1
+              this.marks[this.years.min] = this.years.min.toString()
+              this.posOnTimeGraph[this.years.min] = {
+                    r:[],
+                    theta:[],
+                    text:[]
+                  }
+            }
+            //update Map center
+            avg_x=avg_x/this.searchResult.length
+            avg_y=avg_y/this.searchResult.length
+            map.setView({
+              center: new Microsoft.Maps.Location(avg_x,avg_y),
+              zoom:5
+            })
+
+        },
+        searchClicked : function() {
+            console.log("search clicked")
+            console.log(this.keyword,this.location,this.person)
+            this.searchResult = []
+            this.submit(this.keyword, this.location, this.person);
+        } ,
+
+        showGraph() {
+          console.log("pushpin label clicked")
+        }
+    }
+})
+</script>
+
+
+<script type='text/javascript'>
+    var map, layer;
+    function GetMap()  {
+        map = new Microsoft.Maps.Map('#myMap',{
+            credentials: 'AtIgQlLKYNFcVRnLvuCpb3BHRAAQwLNarnwJiEBnhvLiueLRnF6553ioOe9kCMAe',
+        });
+
+        Microsoft.Maps.loadModule("Microsoft.Maps.Clustering", function () {
+        //Generate 3000 random pushpins in the map view.
+            //var pins = Microsoft.Maps.TestDataGenerator.getPushpins(100, map.getBounds());
+    
+        //Create a ClusterLayer with options and add it to the map.
+        //clusterLayer = new Microsoft.Maps.ClusterLayer(pins,  { gridSize: 100 }, {
+        //      clusteredPinCallback: customizeClusteredPin
+        //  });
+            layer = new Microsoft.Maps.Layer();       
+            //layer.add(pins)     
+            map.layers.insert(layer);
+            
+            Microsoft.Maps.Events.addHandler(layer, 'click', pushpinClicked );
+            Microsoft.Maps.Events.addHandler(layer, 'mouseover');
+        });
+    }
+    function  highlight (id) {
+        console.log(id)
+    }
+    function pushpinClicked(e) {
+        console.log(e)
+        event=e.target.data
+      
+
+        //if (e.target.metadata) {
+            console.log("clicked")
+            //Set the infobox options with the metadata of the pushpin.
+            infobox = new Microsoft.Maps.Infobox(e.target.getLocation(), {
+                title: event.title,
+                description: event.date+", "+event.source,
+                maxHeight:600,
+                actions: [
+                  {
+                    label:"Show graph",
+                    eventHandler: function() {
+                      showModal(vm,event)
+                    }
+                  },
+                  {
+                    label:"Source Page",
+                    eventHandler: function() {
+                      window.location.href=event.url
+                    }
+                  }
+              ]
+        });
+        //}
+        console.log(infobox.actions)
+        infobox.setMap(map);
+        //update Card
+        
+    }
+</script>
+</body>
+
+<script type='text/javascript' src='http://www.bing.com/api/maps/mapcontrol?callback=GetMap' async defer></script>
+
+
+<style type='text/css'>
+    #header {
+      width:200px;
+      height:100px;
+      margin-left:40%;   
+      transform:translateX(-50%);
+
+    }
+    #searchAndResult {
+      width:1200px;
+      margin-left:50%;   
+      transform:translateX(-40%);
+      margin-top:10px;
+    }
+    #resultArea {
+      margin-left:50px;
+    }
+    #inputArea {
+      margin-top:25px;
+    }
+    #newsTab {
+      margin-left:50%;   
+      transform:translateX(-45%);
+      margin-top:10px;
+      margin-bottom:100px;
+    }
+    #myMap {
+     width:1200px;
+     height:800px;
+    }
+</style>
+</html>
